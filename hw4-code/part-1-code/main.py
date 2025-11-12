@@ -11,6 +11,7 @@ import evaluate
 import random
 import argparse
 from utils import *
+import shutil
 import os
 
 # Set seed
@@ -186,6 +187,9 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
 
+    cache_dir = os.path.expanduser("~/.cache/huggingface/datasets")
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir)
     dataset = load_dataset("imdb")
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 

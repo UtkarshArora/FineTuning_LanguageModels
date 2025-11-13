@@ -1,5 +1,6 @@
 import datasets
 from datasets import load_dataset
+from datasets import DatasetDict
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification
@@ -198,8 +199,18 @@ if __name__ == "__main__":
             print(f"Cleared: {cache_dir}")
 
     # Now try loading with ignore_verifications
-    dataset = load_dataset("imdb", trust_remote_code=True)
-
+    dataset = load_dataset("imdb")
+    #try:
+       #dataset = load_dataset("imdb", split=["train", "test"], ignore_verifications=True)
+    #except:
+    # If that fails, try loading just train
+        #dataset = load_dataset("imdb", split="train", ignore_verifications=True)
+    #train_dataset=load_dataset("imdb", split="train")
+    #test_dataset=load_dataset("imdb", split="test")
+    #dataset = DatasetDict({
+    #'train': train_dataset,
+    #'test': test_dataset
+    #})
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     tokenized_dataset = tokenized_dataset.remove_columns(["text"])

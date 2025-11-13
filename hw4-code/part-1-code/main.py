@@ -138,7 +138,10 @@ def create_transformed_dataloader(args, dataset, debug_transformation):
     transformed_tokenized_dataset.set_format("torch")
 
     transformed_val_dataset = transformed_tokenized_dataset
-    eval_dataloader = DataLoader(transformed_val_dataset, batch_size=args.batch_size)
+    eval_dataloader = DataLoader(
+        transformed_val_dataset,
+        batch_size=args.batch_size,
+    )
 
     return eval_dataloader
 
@@ -177,7 +180,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--learning_rate", type=float, default=5e-5)
     parser.add_argument("--num_epochs", type=int, default=3)
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=32)
 
     args = parser.parse_args()
 
@@ -188,29 +191,8 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
 
-    cache_dirs = [
-        os.path.expanduser("~/.cache/huggingface/datasets"),
-        os.path.expanduser("~/.cache/huggingface/hub"),
-    ]
-
-    for cache_dir in cache_dirs:
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-            print(f"Cleared: {cache_dir}")
-
-    # Now try loading with ignore_verifications
     dataset = load_dataset("imdb")
-    #try:
-       #dataset = load_dataset("imdb", split=["train", "test"], ignore_verifications=True)
-    #except:
-    # If that fails, try loading just train
-        #dataset = load_dataset("imdb", split="train", ignore_verifications=True)
-    #train_dataset=load_dataset("imdb", split="train")
-    #test_dataset=load_dataset("imdb", split="test")
-    #dataset = DatasetDict({
-    #'train': train_dataset,
-    #'test': test_dataset
-    #})
+
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     tokenized_dataset = tokenized_dataset.remove_columns(["text"])
@@ -235,7 +217,10 @@ if __name__ == "__main__":
             tokenized_dataset["train"], shuffle=True, batch_size=args.batch_size
         )
         eval_dataloader = DataLoader(
-            tokenized_dataset["test"], batch_size=args.batch_size
+            tokenized_dataset["test"],
+            batch_size=args.batch_size,
+            num_workers=4,
+            pin_memory=True,
         )
         print(f"Actual training...")
         print(f"len(train_dataloader): {len(train_dataloader)}")

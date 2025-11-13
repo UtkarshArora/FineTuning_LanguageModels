@@ -187,10 +187,19 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
 
-    cache_dir = os.path.expanduser("~/.cache/huggingface/datasets")
-    if os.path.exists(cache_dir):
-        shutil.rmtree(cache_dir)
-    dataset = load_dataset("imdb", split=["train", "test"])
+    cache_dirs = [
+        os.path.expanduser("~/.cache/huggingface/datasets"),
+        os.path.expanduser("~/.cache/huggingface/hub"),
+    ]
+
+    for cache_dir in cache_dirs:
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+            print(f"Cleared: {cache_dir}")
+
+    # Now try loading with ignore_verifications
+    dataset = load_dataset("imdb", trust_remote_code=True)
+
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     tokenized_dataset = tokenized_dataset.remove_columns(["text"])

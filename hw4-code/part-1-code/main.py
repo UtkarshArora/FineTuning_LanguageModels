@@ -190,7 +190,7 @@ if __name__ == "__main__":
     cache_dir = os.path.expanduser("~/.cache/huggingface/datasets")
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir)
-    dataset = load_dataset("imdb")
+    dataset = load_dataset("imdb", split=["train", "test"])
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     tokenized_dataset = tokenized_dataset.remove_columns(["text"])

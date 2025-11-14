@@ -46,7 +46,7 @@ def custom_transform(example):
     text = example["text"]
     words = word_tokenize(text)
 
-    replacement_prob = 0.2
+    replacement_prob = 0.4
 
     for i in range(len(words)):
         if random.random() < replacement_prob:

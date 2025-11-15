@@ -180,7 +180,7 @@ def train_epoch(args, model, train_loader, optimizer, scheduler):
         )
 
         num_tokens = non_pad.sum().item()
-        loss = loss / num_tokens
+        # loss = loss / num_tokens
 
         loss.backward()
         optimizer.step()
@@ -189,6 +189,7 @@ def train_epoch(args, model, train_loader, optimizer, scheduler):
 
         with torch.no_grad():
             num_tokens = torch.sum(non_pad).item()
+            # total_loss += loss.item() * num_tokens
             total_loss += loss.item() * num_tokens
             total_tokens += num_tokens
 
@@ -242,12 +243,30 @@ def eval_epoch(
             )
             logits = outputs["logits"]
 
-            non_pad = decoder_targets != PAD_IDX
+            B, T, V = logits.shape
+            non_pad = (decoder_targets != PAD_IDX).view(-1)
             num_tokens = non_pad.sum().item()
+
             if num_tokens > 0:
-                loss = criterion(logits[non_pad], decoder_targets[non_pad])
+                loss = criterion(
+                    logits.view(B * T, V)[non_pad], decoder_targets.view(-1)[non_pad]
+                )
                 total_loss += loss.item() * num_tokens
                 total_tokens += num_tokens
+
+            # if non_pad.sum().item() > 0:
+            #     loss = criterion(
+            #         logits.view(B * T, V)[non_pad], decoder_targets.view(-1)[non_pad]
+            #     )
+            # num_tokens = non_pad.sum().item()
+            # total_loss += loss.item() * num_tokens
+            # total_tokens += num_tokens
+            # non_pad = decoder_targets != PAD_IDX
+            # num_tokens = non_pad.sum().item()
+            # if num_tokens > 0:
+            #     loss = criterion(logits[non_pad], decoder_targets[non_pad])
+            #     total_loss += loss.item() * num_tokens
+            #     total_tokens += num_tokens
 
             # ----- Generation for metrics -----
             gen_ids = model.generate(

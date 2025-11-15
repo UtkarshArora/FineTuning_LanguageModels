@@ -1,4 +1,5 @@
 import os
+import json
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import torch
@@ -11,7 +12,26 @@ class T5Dataset(Dataset):
     def __init__(self, data_folder, split):
         self.split = split
         self.tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
+        self.schema = self.load_and_simplify_schema(data_folder)
+        print(f"Loaded schema: {self.schema}")  # Debug print
         self.data = self.process_data(data_folder, split)
+
+    def load_and_simplify_schema(self, data_folder):
+        """Load and simplify the schema"""
+        schema_path = os.path.join(data_folder, "flight_database.schema")
+
+        try:
+            with open(schema_path, "r") as f:
+                schema_data = json.load(f)
+
+            # Get main table names
+            main_tables = ["flight", "airline", "airport", "fare", "city"]
+            schema_text = "Tables: " + ", ".join(main_tables)
+            return schema_text
+
+        except Exception as e:
+            print(f"Warning: Could not load schema: {e}")
+            return ""
 
     def process_data(self, data_folder, split):
         # Load natural language queries
@@ -28,8 +48,16 @@ class T5Dataset(Dataset):
         # Tokenize data
         data = []
         for i, nl_query in enumerate(nl_queries):
-            # Tokenize encoder input (natural language)
-            encoder_ids = self.tokenizer.encode(nl_query, add_special_tokens=True)
+            # Include schema in the input
+            if self.schema:
+                input_text = f"{self.schema} | {nl_query}"
+            else:
+                input_text = nl_query
+
+            # Tokenize encoder input
+            encoder_ids = self.tokenizer.encode(
+                input_text, add_special_tokens=True, max_length=512, truncation=True
+            )
 
             item = {"encoder_ids": encoder_ids}
 
@@ -37,7 +65,10 @@ class T5Dataset(Dataset):
             if sql_queries is not None:
                 # Tokenize decoder output (SQL query)
                 decoder_ids = self.tokenizer.encode(
-                    sql_queries[i], add_special_tokens=True
+                    sql_queries[i],
+                    add_special_tokens=True,
+                    max_length=256,
+                    truncation=True,
                 )
                 item["decoder_ids"] = decoder_ids
 

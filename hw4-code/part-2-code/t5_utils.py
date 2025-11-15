@@ -7,20 +7,38 @@ from transformers import T5ForConditionalGeneration, T5Config
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 import wandb
 
-DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 def setup_wandb(args):
     # Implement this if you wish to use wandb in your experiments
-    pass
+    wandb.init(
+        project="t5_text_to_sql",  # you can rename this project if you like
+        name=args.experiment_name,
+        config=vars(args),
+    )
+
 
 def initialize_model(args):
-    '''
+    """
     Helper function to initialize the model. You should be either finetuning
     the pretrained model associated with the 'google-t5/t5-small' checkpoint
     or training a T5 model initialized with the 'google-t5/t5-small' config
     from scratch.
-    '''
-    pass
+    """
+    model_name = "google-t5/t5-small"
+
+    if getattr(args, "finetune", False):
+        # Fine-tune from a pretrained checkpoint
+        model = T5ForConditionalGeneration.from_pretrained(model_name)
+    else:
+        # Extra-credit case: train from scratch with the same architecture
+        config = T5Config.from_pretrained(model_name)
+        model = T5ForConditionalGeneration(config)
+
+    model.to(DEVICE)
+    return model
+
 
 def mkdir(dirpath):
     if not os.path.exists(dirpath):
@@ -29,32 +47,60 @@ def mkdir(dirpath):
         except FileExistsError:
             pass
 
+
 def save_model(checkpoint_dir, model, best):
     # Save model checkpoint to be able to load the model later
-    pass
+    mkdir(checkpoint_dir)
+    filename = "best_model.pt" if best else "last_model.pt"
+    filepath = os.path.join(checkpoint_dir, filename)
+    torch.save(model.state_dict(), filepath)
+
 
 def load_model_from_checkpoint(args, best):
     # Load model from a checkpoint
-    pass
+    checkpoint_dir = getattr(args, "checkpoint_dir", None)
+    if checkpoint_dir is None:
+        raise ValueError("args.checkpoint_dir is not set; cannot load checkpoint.")
+
+    filename = "best_model.pt" if best else "last_model.pt"
+    filepath = os.path.join(checkpoint_dir, filename)
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"Checkpoint not found at {filepath}")
+
+    # Recreate the same architecture and load weights
+    model = initialize_model(args)
+    state_dict = torch.load(filepath, map_location=DEVICE)
+    model.load_state_dict(state_dict)
+    model.to(DEVICE)
+    return model
+
 
 def initialize_optimizer_and_scheduler(args, model, epoch_length):
     optimizer = initialize_optimizer(args, model)
     scheduler = initialize_scheduler(args, optimizer, epoch_length)
     return optimizer, scheduler
 
+
 def initialize_optimizer(args, model):
-    decay_parameters = get_parameter_names(model, transformers.pytorch_utils.ALL_LAYERNORM_LAYERS)
+    decay_parameters = get_parameter_names(
+        model, transformers.pytorch_utils.ALL_LAYERNORM_LAYERS
+    )
     decay_parameters = [name for name in decay_parameters if "bias" not in name]
     optimizer_grouped_parameters = [
         {
             "params": [
-                p for n, p in model.named_parameters() if (n in decay_parameters and p.requires_grad)
+                p
+                for n, p in model.named_parameters()
+                if (n in decay_parameters and p.requires_grad)
             ],
             "weight_decay": args.weight_decay,
         },
         {
             "params": [
-                p for n, p in model.named_parameters() if (n not in decay_parameters and p.requires_grad)
+                p
+                for n, p in model.named_parameters()
+                if (n not in decay_parameters and p.requires_grad)
             ],
             "weight_decay": 0.0,
         },
@@ -62,13 +108,17 @@ def initialize_optimizer(args, model):
 
     if args.optimizer_type == "AdamW":
         optimizer = torch.optim.AdamW(
-            optimizer_grouped_parameters, lr=args.learning_rate, eps=1e-8, betas=(0.9, 0.999)
+            optimizer_grouped_parameters,
+            lr=args.learning_rate,
+            eps=1e-8,
+            betas=(0.9, 0.999),
         )
     else:
         pass
 
     return optimizer
-        
+
+
 def initialize_scheduler(args, optimizer, epoch_length):
     num_training_steps = epoch_length * args.max_n_epochs
     num_warmup_steps = epoch_length * args.num_warmup_epochs
@@ -76,11 +126,16 @@ def initialize_scheduler(args, optimizer, epoch_length):
     if args.scheduler_type == "none":
         return None
     elif args.scheduler_type == "cosine":
-        return transformers.get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps)
+        return transformers.get_cosine_schedule_with_warmup(
+            optimizer, num_warmup_steps, num_training_steps
+        )
     elif args.scheduler_type == "linear":
-        return transformers.get_linear_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps)
+        return transformers.get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps, num_training_steps
+        )
     else:
         raise NotImplementedError
+
 
 def get_parameter_names(model, forbidden_layer_types):
     result = []
@@ -93,4 +148,3 @@ def get_parameter_names(model, forbidden_layer_types):
     # Add model specific parameters (defined with nn.Parameter) since they are not in any child.
     result += list(model._parameters.keys())
     return result
-

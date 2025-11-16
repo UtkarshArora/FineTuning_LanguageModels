@@ -360,10 +360,8 @@ def main():
         args, model, len(train_loader)
     )
 
-    # Train
     train(args, model, train_loader, dev_loader, optimizer, scheduler)
 
-    # Evaluate
     model = load_model_from_checkpoint(args, best=True)
     model.eval()
 

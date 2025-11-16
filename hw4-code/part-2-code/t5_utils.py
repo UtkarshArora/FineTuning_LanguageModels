@@ -29,10 +29,8 @@ def initialize_model(args):
     model_name = "google-t5/t5-small"
 
     if getattr(args, "finetune", False):
-        # Fine-tune from a pretrained checkpoint
         model = T5ForConditionalGeneration.from_pretrained(model_name)
     else:
-        # Extra-credit case: train from scratch with the same architecture
         config = T5Config.from_pretrained(model_name)
         model = T5ForConditionalGeneration(config)
 

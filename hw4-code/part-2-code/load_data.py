@@ -47,12 +47,11 @@ class T5Dataset(Dataset):
 
         # Tokenize data
         data = []
+        prompt = "Translate this query to SQL:"
         for i, nl_query in enumerate(nl_queries):
             # Include schema in the input
             if self.schema:
-                input_text = (
-                    f"{self.schema} | {"Translate this query to SQL:"} {nl_query}"
-                )
+                input_text = f"{self.schema} | {prompt} {nl_query}"
             else:
                 input_text = nl_query
 

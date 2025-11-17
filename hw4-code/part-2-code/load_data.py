@@ -12,8 +12,11 @@ class T5Dataset(Dataset):
     def __init__(self, data_folder, split):
         self.split = split
         self.tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
-        # self.schema = self.load_and_simplify_schema(data_folder)
-        # print(f"Loaded schema: {self.schema}")  # Debug print
+        self.bos_token_id = self.tokenizer.convert_tokens_to_ids("<extra_id_0>")
+        if self.bos_token_id == self.tokenizer.unk_token_id:
+            # Fallback: just use pad as BOS if extra_id_0 not available
+            self.bos_token_id = self.tokenizer.pad_token_id
+
         self.data = self.process_data(data_folder, split)
 
     # def load_and_simplify_schema(self, data_folder):
@@ -47,15 +50,13 @@ class T5Dataset(Dataset):
 
         # Tokenize data
         data = []
-        prompt = "Translate to SQL:"
+        prompt = "translate to SQL:"  # match hp style (lowercase)
         for i, nl_query in enumerate(nl_queries):
-            input_text = f"translate to SQL: {nl_query}"
-            # else:
-            # input_text = nl_query
+            input_text = f"{prompt} {nl_query}"
 
             # Tokenize encoder input
             encoder_ids = self.tokenizer.encode(
-                input_text, add_special_tokens=True, max_length=256, truncation=True
+                input_text, add_special_tokens=True, max_length=512, truncation=True
             )
 
             item = {"encoder_ids": encoder_ids}
@@ -63,12 +64,15 @@ class T5Dataset(Dataset):
             # For train/dev, also tokenize decoder targets
             if sql_queries is not None:
                 # Tokenize decoder output (SQL query)
-                decoder_ids = self.tokenizer.encode(
+                decoder_target_ids = self.tokenizer.encode(
                     sql_queries[i],
                     add_special_tokens=True,
                     max_length=256,
                     truncation=True,
                 )
+                # NEW: prepend BOS token so collate can shift correctly
+                decoder_ids = [self.bos_token_id] + decoder_target_ids
+
                 item["decoder_ids"] = decoder_ids
 
             data.append(item)
@@ -149,8 +153,13 @@ def test_collate_fn(batch):
     # Create attention mask for encoder
     encoder_mask = (encoder_ids_padded != PAD_IDX).long()
 
-    # For T5, the decoder start token is pad_token_id (0)
-    initial_decoder_inputs = torch.zeros((len(batch), 1), dtype=torch.long)
+    # NEW: use same BOS token as during training (<extra_id_0>, or pad as fallback)
+    tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
+    bos_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
+    if bos_token_id == tokenizer.unk_token_id:
+        bos_token_id = tokenizer.pad_token_id
+
+    initial_decoder_inputs = torch.full((len(batch), 1), bos_token_id, dtype=torch.long)
 
     return encoder_ids_padded, encoder_mask, initial_decoder_inputs
 

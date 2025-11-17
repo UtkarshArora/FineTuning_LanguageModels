@@ -173,11 +173,9 @@ def train_epoch(args, model, train_loader, optimizer, scheduler):
             decoder_input_ids=decoder_input,
         )["logits"]
 
-        B, T, V = logits.shape
-        non_pad = (decoder_targets != PAD_IDX).view(-1)
-        loss = criterion(
-            logits.view(B * T, V)[non_pad], decoder_targets.view(-1)[non_pad]
-        )
+        # NEW: simpler, safer masking (like _hp)
+        non_pad = decoder_targets != PAD_IDX  # shape [B, T]
+        loss = criterion(logits[non_pad], decoder_targets[non_pad])
 
         num_tokens = non_pad.sum().item()
         # loss = loss / num_tokens
@@ -215,8 +213,11 @@ def eval_epoch(
     we found the cross-entropy loss (in the evaluation set) to be well (albeit imperfectly) correlated with F1 performance.
     """
     model.eval()
-    criterion = nn.CrossEntropyLoss()
     tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
+    decoder_start_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
+    if decoder_start_token_id == tokenizer.unk_token_id:
+        decoder_start_token_id = tokenizer.pad_token_id
+    criterion = nn.CrossEntropyLoss()
 
     total_loss = 0.0
     total_tokens = 0
@@ -241,18 +242,19 @@ def eval_epoch(
                 attention_mask=encoder_mask,
                 decoder_input_ids=decoder_input,
             )
-            logits = outputs["logits"]
+            logits = model(
+                input_ids=encoder_input,
+                attention_mask=encoder_mask,
+                decoder_input_ids=decoder_input,
+            )["logits"]
 
-            B, T, V = logits.shape
-            non_pad = (decoder_targets != PAD_IDX).view(-1)
+            # Same loss as train_epoch
+            non_pad = decoder_targets != PAD_IDX
+            loss = criterion(logits[non_pad], decoder_targets[non_pad])
+
             num_tokens = non_pad.sum().item()
-
-            if num_tokens > 0:
-                loss = criterion(
-                    logits.view(B * T, V)[non_pad], decoder_targets.view(-1)[non_pad]
-                )
-                total_loss += loss.item() * num_tokens
-                total_tokens += num_tokens
+            total_loss += loss.item() * num_tokens
+            total_tokens += num_tokens
 
             # if non_pad.sum().item() > 0:
             #     loss = criterion(
@@ -269,18 +271,20 @@ def eval_epoch(
             #     total_tokens += num_tokens
 
             # ----- Generation for metrics -----
-            gen_ids = model.generate(
+            generated_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                generation_config=gen_config,
-                num_beams=2,
-                early_stopping=True,
-                no_repeat_ngram_size=2,
+                max_length=512,  # allow enough room for full SQL
+                num_beams=2,  # small beam search (hp uses 2)
+                decoder_start_token_id=decoder_start_token_id,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
             )
-            # Decode to SQL strings
-            batch_sql = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
-            batch_sql = [s.strip() for s in batch_sql]
-            all_pred_sql.extend(batch_sql)
+
+            pred_sql_batch = tokenizer.batch_decode(
+                generated_ids, skip_special_tokens=True
+            )
+            all_pred_sql.extend(pred_sql_batch)
 
     avg_loss = total_loss / total_tokens if total_tokens > 0 else 0.0
 
@@ -324,10 +328,13 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
     """
     model.eval()
     tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
+    decoder_start_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
+    if decoder_start_token_id == tokenizer.unk_token_id:
+        decoder_start_token_id = tokenizer.pad_token_id
 
     all_pred_sql = []
 
-    gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
+    # gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
 
     with torch.no_grad():
         for encoder_input, encoder_mask, _ in tqdm(test_loader):
@@ -337,7 +344,11 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             gen_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                generation_config=gen_config,
+                max_length=512,
+                num_beams=2,
+                decoder_start_token_id=decoder_start_token_id,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
             )
             batch_sql = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             batch_sql = [s.strip() for s in batch_sql]
@@ -377,7 +388,7 @@ def main():
     model_record_path = os.path.join(
         f"records/t5_{model_type}_{experiment_name}_dev.pkl"
     )
-    dev_loss, dev_record_em, dev_record_f1, dev_sql_em, dev_error_rate = eval_epoch(
+    dev_loss, dev_record_f1, dev_record_em, dev_sql_em, dev_error_rate = eval_epoch(
         args,
         model,
         dev_loader,

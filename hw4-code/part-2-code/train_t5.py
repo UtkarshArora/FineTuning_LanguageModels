@@ -273,8 +273,7 @@ def eval_epoch(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 generation_config=gen_config,
-                max_length=384,
-                num_beams=5,
+                num_beams=2,
                 early_stopping=True,
                 no_repeat_ngram_size=2,
             )
@@ -339,8 +338,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 generation_config=gen_config,
-                max_length=384,
-                num_beams=5,
+                num_beams=2,
                 early_stopping=True,
                 no_repeat_ngram_size=2,
             )

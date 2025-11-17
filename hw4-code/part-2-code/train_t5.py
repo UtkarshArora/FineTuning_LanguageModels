@@ -249,8 +249,8 @@ def eval_epoch(
             generated_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_length=256,
-                num_beams=4,
+                max_length=512,
+                num_beams=2,
                 decoder_start_token_id=decoder_start_token_id,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
@@ -300,8 +300,8 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             gen_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_length=256,
-                num_beams=4,
+                max_length=512,
+                num_beams=2,
                 decoder_start_token_id=decoder_start_token_id,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,

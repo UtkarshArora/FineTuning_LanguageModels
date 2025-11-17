@@ -49,15 +49,13 @@ class T5Dataset(Dataset):
         data = []
         prompt = "Translate to SQL:"
         for i, nl_query in enumerate(nl_queries):
-            # Include schema in the input
-            # if self.schema:
-            input_text = f"{prompt} | {nl_query}"
+            input_text = f"translate to SQL: {nl_query}"
             # else:
             # input_text = nl_query
 
             # Tokenize encoder input
             encoder_ids = self.tokenizer.encode(
-                input_text, add_special_tokens=True, max_length=512, truncation=True
+                input_text, add_special_tokens=True, max_length=256, truncation=True
             )
 
             item = {"encoder_ids": encoder_ids}

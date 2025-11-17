@@ -223,7 +223,7 @@ def eval_epoch(
     all_pred_sql = []
 
     # Simple generation config: beam search with a reasonable max length
-    gen_config = GenerationConfig(max_new_tokens=128, num_beams=4, early_stopping=True)
+    gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
 
     with torch.no_grad():
         for encoder_input, encoder_mask, decoder_input, decoder_targets, _ in tqdm(
@@ -327,7 +327,7 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
 
     all_pred_sql = []
 
-    gen_config = GenerationConfig(max_new_tokens=128, num_beams=4, early_stopping=True)
+    gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
 
     with torch.no_grad():
         for encoder_input, encoder_mask, _ in tqdm(test_loader):
@@ -338,9 +338,6 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 generation_config=gen_config,
-                num_beams=2,
-                early_stopping=True,
-                no_repeat_ngram_size=2,
             )
             batch_sql = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             batch_sql = [s.strip() for s in batch_sql]

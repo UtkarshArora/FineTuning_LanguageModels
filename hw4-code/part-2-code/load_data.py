@@ -29,7 +29,7 @@ class T5Dataset(Dataset):
             sql_queries = None
 
         data = []
-        prompt = "translate the question to a valid SQL query:"
+        prompt = "translate to SQL:"
         for i, nl_query in enumerate(nl_queries):
             input_text = f"{prompt} {nl_query}"
 

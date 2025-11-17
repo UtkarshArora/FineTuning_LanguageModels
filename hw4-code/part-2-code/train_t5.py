@@ -333,7 +333,7 @@ def main():
     model = load_model_from_checkpoint(args, best=True)
     model.eval()
 
-    experiment_name = "ft_experiment"
+    experiment_name = args.experiment_name
     model_type = "ft" if args.finetune else "scr"
     gt_sql_path = os.path.join(f"data/dev.sql")
     gt_record_path = os.path.join(f"records/ground_truth_dev.pkl")

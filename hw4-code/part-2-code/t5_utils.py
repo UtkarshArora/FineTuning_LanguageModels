@@ -11,9 +11,8 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 def setup_wandb(args):
-    # Implement this if you wish to use wandb in your experiments
     wandb.init(
-        project="t5_text_to_sql",  # you can rename this project if you like
+        project="t5_text_to_sql",
         name=args.experiment_name,
         config=vars(args),
     )
@@ -47,7 +46,6 @@ def mkdir(dirpath):
 
 
 def save_model(checkpoint_dir, model, best):
-    # Save model checkpoint to be able to load the model later
     mkdir(checkpoint_dir)
     filename = "best_model.pt" if best else "last_model.pt"
     filepath = os.path.join(checkpoint_dir, filename)
@@ -55,7 +53,6 @@ def save_model(checkpoint_dir, model, best):
 
 
 def load_model_from_checkpoint(args, best):
-    # Load model from a checkpoint
     checkpoint_dir = getattr(args, "checkpoint_dir", None)
     if checkpoint_dir is None:
         raise ValueError("args.checkpoint_dir is not set; cannot load checkpoint.")
@@ -66,7 +63,6 @@ def load_model_from_checkpoint(args, best):
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"Checkpoint not found at {filepath}")
 
-    # Recreate the same architecture and load weights
     model = initialize_model(args)
     state_dict = torch.load(filepath, map_location=DEVICE)
     model.load_state_dict(state_dict)
@@ -143,6 +139,5 @@ def get_parameter_names(model, forbidden_layer_types):
             for n in get_parameter_names(child, forbidden_layer_types)
             if not isinstance(child, tuple(forbidden_layer_types))
         ]
-    # Add model specific parameters (defined with nn.Parameter) since they are not in any child.
     result += list(model._parameters.keys())
     return result

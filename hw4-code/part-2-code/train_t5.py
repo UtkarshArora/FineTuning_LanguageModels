@@ -28,12 +28,10 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description="T5 training loop")
 
-    # Model hyperparameters
     parser.add_argument(
         "--finetune", action="store_true", help="Whether to finetune T5 or not"
     )
 
-    # Training hyperparameters
     parser.add_argument(
         "--optimizer_type",
         type=str,
@@ -173,12 +171,10 @@ def train_epoch(args, model, train_loader, optimizer, scheduler):
             decoder_input_ids=decoder_input,
         )["logits"]
 
-        # NEW: simpler, safer masking (like _hp)
-        non_pad = decoder_targets != PAD_IDX  # shape [B, T]
+        non_pad = decoder_targets != PAD_IDX
         loss = criterion(logits[non_pad], decoder_targets[non_pad])
 
         num_tokens = non_pad.sum().item()
-        # loss = loss / num_tokens
 
         loss.backward()
         optimizer.step()
@@ -187,7 +183,6 @@ def train_epoch(args, model, train_loader, optimizer, scheduler):
 
         with torch.no_grad():
             num_tokens = torch.sum(non_pad).item()
-            # total_loss += loss.item() * num_tokens
             total_loss += loss.item() * num_tokens
             total_tokens += num_tokens
 
@@ -223,14 +218,10 @@ def eval_epoch(
     total_tokens = 0
     all_pred_sql = []
 
-    # Simple generation config: beam search with a reasonable max length
-    gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
-
     with torch.no_grad():
         for encoder_input, encoder_mask, decoder_input, decoder_targets, _ in tqdm(
             dev_loader
         ):
-            # Move to device
             encoder_input = encoder_input.to(DEVICE)
             encoder_mask = encoder_mask.to(DEVICE)
             decoder_input = decoder_input.to(DEVICE)
@@ -248,7 +239,6 @@ def eval_epoch(
                 decoder_input_ids=decoder_input,
             )["logits"]
 
-            # Same loss as train_epoch
             non_pad = decoder_targets != PAD_IDX
             loss = criterion(logits[non_pad], decoder_targets[non_pad])
 
@@ -256,26 +246,11 @@ def eval_epoch(
             total_loss += loss.item() * num_tokens
             total_tokens += num_tokens
 
-            # if non_pad.sum().item() > 0:
-            #     loss = criterion(
-            #         logits.view(B * T, V)[non_pad], decoder_targets.view(-1)[non_pad]
-            #     )
-            # num_tokens = non_pad.sum().item()
-            # total_loss += loss.item() * num_tokens
-            # total_tokens += num_tokens
-            # non_pad = decoder_targets != PAD_IDX
-            # num_tokens = non_pad.sum().item()
-            # if num_tokens > 0:
-            #     loss = criterion(logits[non_pad], decoder_targets[non_pad])
-            #     total_loss += loss.item() * num_tokens
-            #     total_tokens += num_tokens
-
-            # ----- Generation for metrics -----
             generated_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_length=512,  # allow enough room for full SQL
-                num_beams=2,  # small beam search (hp uses 2)
+                max_length=256,
+                num_beams=4,
                 decoder_start_token_id=decoder_start_token_id,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
@@ -288,16 +263,8 @@ def eval_epoch(
 
     avg_loss = total_loss / total_tokens if total_tokens > 0 else 0.0
 
-    # Save predicted queries + their DB records
     save_queries_and_records(all_pred_sql, model_sql_path, model_record_path)
 
-    # Compute metrics against ground truth
-    # sql_em, record_em, record_f1, model_error_msgs = compute_metrics(
-    #     gt_sql_pth,
-    #     model_sql_path,
-    #     gt_record_path,
-    #     model_record_path,
-    # )
     sql_em, record_em, record_f1, model_error_msgs = compute_metrics(
         gt_sql_pth,
         model_sql_path,
@@ -305,21 +272,12 @@ def eval_epoch(
         model_record_path,
     )
 
-    # Syntax error rate: non-empty error messages
     num_errors = sum(1 for msg in model_error_msgs if msg)
     error_rate = num_errors / len(model_error_msgs) if model_error_msgs else 0.0
 
-    # IMPORTANT: return order matches how train() unpacks:
-    # eval_loss, record_f1, record_em, sql_em, error_rate
     return avg_loss, record_f1, record_em, sql_em, error_rate
 
 
-# def test_inference(args, model, test_loader, model_sql_path, model_record_path):
-#     """
-#     You must implement inference to compute your model's generated SQL queries and its associated
-#     database records. Implementation should be very similar to eval_epoch.
-#     """
-#     pass
 def test_inference(args, model, test_loader, model_sql_path, model_record_path):
     """
     Run inference on the test set and save:
@@ -334,8 +292,6 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
 
     all_pred_sql = []
 
-    # gen_config = GenerationConfig(max_new_tokens=256, num_beams=2, early_stopping=True)
-
     with torch.no_grad():
         for encoder_input, encoder_mask, _ in tqdm(test_loader):
             encoder_input = encoder_input.to(DEVICE)
@@ -344,8 +300,8 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             gen_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                max_length=512,
-                num_beams=2,
+                max_length=256,
+                num_beams=4,
                 decoder_start_token_id=decoder_start_token_id,
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
@@ -354,7 +310,6 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
             batch_sql = [s.strip() for s in batch_sql]
             all_pred_sql.extend(batch_sql)
 
-    # Save queries and compute their records
     save_queries_and_records(all_pred_sql, model_sql_path, model_record_path)
 
 
@@ -365,7 +320,6 @@ def main():
         # Recommended: Using wandb (or tensorboard) for result logging can make experimentation easier
         setup_wandb(args)
 
-    # Load the data and the model
     train_loader, dev_loader, test_loader = load_t5_data(
         args.batch_size, args.test_batch_size
     )
@@ -379,7 +333,6 @@ def main():
     model = load_model_from_checkpoint(args, best=True)
     model.eval()
 
-    # Dev set
     experiment_name = "ft_experiment"
     model_type = "ft" if args.finetune else "scr"
     gt_sql_path = os.path.join(f"data/dev.sql")
@@ -404,7 +357,6 @@ def main():
         f"Dev set results: {dev_error_rate*100:.2f}% of the generated outputs led to SQL errors"
     )
 
-    # Test set
     model_sql_path = os.path.join(f"results/t5_{model_type}_{experiment_name}_test.sql")
     model_record_path = os.path.join(
         f"records/t5_{model_type}_{experiment_name}_test.pkl"

@@ -12,26 +12,26 @@ class T5Dataset(Dataset):
     def __init__(self, data_folder, split):
         self.split = split
         self.tokenizer = T5TokenizerFast.from_pretrained("google-t5/t5-small")
-        self.schema = self.load_and_simplify_schema(data_folder)
-        print(f"Loaded schema: {self.schema}")  # Debug print
+        # self.schema = self.load_and_simplify_schema(data_folder)
+        # print(f"Loaded schema: {self.schema}")  # Debug print
         self.data = self.process_data(data_folder, split)
 
-    def load_and_simplify_schema(self, data_folder):
-        """Load and simplify the schema"""
-        schema_path = os.path.join(data_folder, "flight_database.schema")
+    # def load_and_simplify_schema(self, data_folder):
+    #     """Load and simplify the schema"""
+    #     schema_path = os.path.join(data_folder, "flight_database.schema")
 
-        try:
-            with open(schema_path, "r") as f:
-                schema_data = json.load(f)
+    #     try:
+    #         with open(schema_path, "r") as f:
+    #             schema_data = json.load(f)
 
-            # Get main table names
-            main_tables = ["flight", "airline", "airport", "fare", "city"]
-            schema_text = "Tables: " + ", ".join(main_tables)
-            return schema_text
+    #         # Get main table names
+    #         main_tables = ["flight", "airline", "airport", "fare", "city"]
+    #         schema_text = "Tables: " + ", ".join(main_tables)
+    #         return schema_text
 
-        except Exception as e:
-            print(f"Warning: Could not load schema: {e}")
-            return ""
+    #     except Exception as e:
+    #         print(f"Warning: Could not load schema: {e}")
+    #         return ""
 
     def process_data(self, data_folder, split):
         # Load natural language queries
@@ -47,13 +47,13 @@ class T5Dataset(Dataset):
 
         # Tokenize data
         data = []
-        prompt = "Translate this query to SQL:"
+        prompt = "Translate to SQL:"
         for i, nl_query in enumerate(nl_queries):
             # Include schema in the input
-            if self.schema:
-                input_text = f"{self.schema} | {prompt} {nl_query}"
-            else:
-                input_text = nl_query
+            # if self.schema:
+            input_text = f"{prompt} | {nl_query}"
+            # else:
+            # input_text = nl_query
 
             # Tokenize encoder input
             encoder_ids = self.tokenizer.encode(

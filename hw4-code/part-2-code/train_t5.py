@@ -273,6 +273,10 @@ def eval_epoch(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 generation_config=gen_config,
+                max_length=384,
+                num_beams=5,
+                early_stopping=True,
+                no_repeat_ngram_size=2,
             )
             # Decode to SQL strings
             batch_sql = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
@@ -335,6 +339,10 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 generation_config=gen_config,
+                max_length=384,
+                num_beams=5,
+                early_stopping=True,
+                no_repeat_ngram_size=2,
             )
             batch_sql = tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             batch_sql = [s.strip() for s in batch_sql]

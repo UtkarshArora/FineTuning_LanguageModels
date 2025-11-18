@@ -43,7 +43,7 @@ class T5Dataset(Dataset):
                 decoder_target_ids = self.tokenizer.encode(
                     sql_queries[i],
                     add_special_tokens=True,
-                    max_length=256,
+                    max_length=512,
                     truncation=True,
                 )
                 decoder_ids = [self.bos_token_id] + decoder_target_ids

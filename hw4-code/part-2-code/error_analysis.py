@@ -67,7 +67,27 @@ def categorize_error(nl_query, ground_truth, prediction):
         ):
             return "wrong_join_type"
 
-    # Category 2: Missing or incorrect WHERE clause
+    # Category 2: Wrong aggregate function
+    gt_agg = re.findall(r"(count|sum|avg|max|min)\s*\(", gt_lower)
+    pred_agg = re.findall(r"(count|sum|avg|max|min)\s*\(", pred_lower)
+    if gt_agg != pred_agg:
+        return "wrong_aggregate"
+
+    # Category 3: Incorrect table or column names
+    gt_tables = re.findall(r"from\s+(\w+)", gt_lower)
+    pred_tables = re.findall(r"from\s+(\w+)", pred_lower)
+    if gt_tables != pred_tables:
+        return "wrong_table"
+
+    # Category 4: Missing or incorrect GROUP BY
+    if "group by" in gt_lower and "group by" not in pred_lower:
+        return "missing_group_by"
+
+    # Category 5: Missing or incorrect ORDER BY
+    if "order by" in gt_lower and "order by" not in pred_lower:
+        return "missing_order_by"
+
+    # Category 6: Missing or incorrect WHERE clause
     if "where" in gt_lower and "where" not in pred_lower:
         return "missing_where"
     elif "where" in gt_lower and "where" in pred_lower:
@@ -84,26 +104,6 @@ def categorize_error(nl_query, ground_truth, prediction):
         )
         if gt_conditions.strip() != pred_conditions.strip():
             return "wrong_where_condition"
-
-    # Category 3: Wrong aggregate function
-    gt_agg = re.findall(r"(count|sum|avg|max|min)\s*\(", gt_lower)
-    pred_agg = re.findall(r"(count|sum|avg|max|min)\s*\(", pred_lower)
-    if gt_agg != pred_agg:
-        return "wrong_aggregate"
-
-    # Category 4: Incorrect table or column names
-    gt_tables = re.findall(r"from\s+(\w+)", gt_lower)
-    pred_tables = re.findall(r"from\s+(\w+)", pred_lower)
-    if gt_tables != pred_tables:
-        return "wrong_table"
-
-    # Category 5: Missing or incorrect GROUP BY
-    if "group by" in gt_lower and "group by" not in pred_lower:
-        return "missing_group_by"
-
-    # Category 6: Missing or incorrect ORDER BY
-    if "order by" in gt_lower and "order by" not in pred_lower:
-        return "missing_order_by"
 
     # Default: other error
     return "other_error"
